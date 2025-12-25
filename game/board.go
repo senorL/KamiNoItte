@@ -2,7 +2,7 @@ package game
 
 import "fmt"
 
-const Size = 15
+const Size = 6
 
 type Board [Size][Size]int
 
@@ -11,7 +11,7 @@ type Point struct {
 	Y int
 }
 
-func (b *Board) PlaceStone(x, y int, player int) (bool, string) {
+func (b *Board) PlaceStone(x, y int, player int) (result bool, err string) {
 	if x < 0 || x >= Size || y < 0 || y >= Size {
 		return false, "越界"
 	}
