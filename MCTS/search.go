@@ -1,137 +1,160 @@
 package mcts
 
 import (
-	"fmt"
-	"kaminotte/game"
 	"math"
 	"math/rand"
+	"kaminotte/game"
 )
 
-// UCB1ExplorationConstant 是 UCB 公式里的 C 值，通常取 1.414 (根号2)
-// 这个值决定了 AI 是更喜欢"稳扎稳打"(选胜率高的) 还是 "勇于探索"(选下得少的)
+// UCB1ExplorationConstant 是 UCB 公式里的 C 值
+// 理论值是 1.414，你可以调整它来看看 AI 性格的变化
 const UCB1ExplorationConstant = 1.414
 
-// MCTSSearch 是主入口：给我一个局面，我算 iterations 次，告诉你下一步最好走哪
+// MCTSSearch 主函数：给我一个局面，我思考 iterations 次，告诉你怎么走
 func MCTSSearch(rootBoard game.Board, nextPlayer int, iterations int) game.Point {
-	// 1. 创建根节点
-	// 注意：根节点的父节点是 nil，上一手棋我们不知道也可以填空
+	// 1. 创建根节点 (root)
+	// 根节点的 Parent 是 nil，Move 是无效值(-1, -1)
 	root := NewNode(rootBoard, nil, game.Point{X: -1, Y: -1}, nextPlayer)
 
-	// 2. 循环 iterations 次，不断让树变大
+	// 2. 循环思考 iterations 次
 	for i := 0; i < iterations; i++ {
-		// --- 你的任务：把这 4 个步骤串起来 ---
-		
+		// --- MCTS 四部曲 ---
+
 		// Step 1: Selection (选择)
-		// 从根节点一直往下找，直到找到一个"边缘节点"(还没完全扩展的节点)
+		// 顺着树往下找，直到找到一个"还没被完全探索"的节点
+		// (也就是这个节点还有空位没生成子节点，或者是游戏结束了)
 		node := selectNode(root)
 
 		// Step 2: Expansion (扩展)
-		// 如果这个节点还没结束游戏，给它长出一个新的子节点
+		// 如果游戏没结束，在这个节点上长出一个新的树枝(子节点)
+		// 也就是挑一个还没试过的空位走一步
 		child := expand(node)
 
 		// Step 3: Simulation (模拟)
-		// 从这个新子节点开始，随机瞎下直到终局，看谁赢
+		// 从这个新长出来的子节点开始，双方瞎下直到终局
+		// 这个你最熟了，就是昨天的 PVP/PVC 逻辑
 		winner := simulate(child)
 
 		// Step 4: Backpropagation (回溯)
-		// 把模拟结果(赢/输)告诉这一路上的所有父节点
+		// 把模拟的结果(赢/输)告诉这一路上的所有长辈节点
 		backpropagate(child, winner)
 	}
 
-	// 3. 搜索结束，找出根节点下面访问次数(Visits)最多的那个孩子，就是我们的一手
+	// 3. 思考时间到，选择访问次数(Visits)最多的那个孩子作为下一步
+	// 注意：这里通常不选胜率最高的，而是选Visits最多的，因为Visits多说明最靠谱
 	bestChild := getBestChild(root)
+	
+	// 防御性编程：如果没有孩子（比如棋盘满了），返回一个特殊值
+	if bestChild == nil {
+		return game.Point{X: -1, Y: -1}
+	}
+
 	return bestChild.Move
 }
 
 // -----------------------------------------------------------------------
-// 下面是需要你补充完整的 4 个核心函数
+// 你的作业：请完成下面这 5 个核心函数
 // -----------------------------------------------------------------------
 
-// Step 1: Selection
-// 一直往下走，直到找到一个叶子节点
+// 作业 1: Selection
+// 一直往下找 (node = bestChild)，直到 node 是叶子节点，或者 node 还有没尝试过的落子点
 func selectNode(node *MCTSNode) *MCTSNode {
 	// 提示：
-	// 1. 如果 node 还有孩子没生出来 (比如棋盘有空位，但 Children 列表还没满)，
-	//    那它就是我们要找的边缘节点，直接返回 node。
-	// 2. 如果 node 的孩子全都生齐了，我们就得用 UCB 公式挑一个"最值得探索"的孩子，
-	//    然后让那个孩子继续 selectNode (递归)。
-	// 3. 如果 node 已经是终局了(没法再走了)，也直接返回 node。
-
+	// 这是一个循环：for !isLeaf(node) && isFullyExpanded(node) { ... }
+	// 在循环里，你需要找到 UCB 值最大的那个孩子，然后 node = bestChild
+	// 只有当一个节点的所有可能落子都被长出子节点了，我们才用 UCB 去选深一层的
+	// 如果这个节点还有空位没试过，那它就是我们要找的边缘，直接返回它，交给 expand 去扩展
+	
 	// TODO: 你的代码
-	return node // 占位符
+	return node 
 }
 
-// Step 2: Expansion
-// 挑选一个还没尝试过的动作，生成一个新的子节点
+// 作业 2: Expansion
+// 挑一个还没长出来的动作，生成一个新的子节点
 func expand(node *MCTSNode) *MCTSNode {
 	// 提示：
-	// 1. 获取所有合法的空位 (GetEmptyPoints)
-	// 2. 检查哪些空位是 Children 里没有的 (也就是还没走过的路)
-	// 3. 挑一个新路，创建 NewNode
-	// 4. 把新节点加入到 node.Children
-	// 5. 返回这个新节点
-
+	// 1. 获取当前局面的所有空位 (board.GetEmptyPoints)
+	// 2. 这里的难点是：要过滤掉那些已经在 node.Children 里的点
+	//    (比如 (1,1) 已经在 Children 里了，就不能再 expand 它了)
+	// 3. 从剩下的未尝试空位里，随机挑一个
+	// 4. 执行落子 (PlaceStone)，创建新节点 (NewNode)
+	// 5. 把新节点 append 到 node.Children 里
+	// 6. 返回这个新节点
+	
 	// TODO: 你的代码
-	return node // 占位符
+	return nil 
 }
 
-// Step 3: Simulation
-// 就是你之前写的 SimulateGame，逻辑基本一样
+// 作业 3: Simulation
+// 快速随机模拟直到游戏结束
 func simulate(node *MCTSNode) int {
 	// 提示：
-	// 1. 拿到 node.Board 的副本 (注意不要改坏了树上的节点)
-	// 2. 拿到 node.NextPlayer
-	// 3. 死循环：随机下子 -> 判赢 -> 换人
-	// 4. 返回赢家 (1 或 2，平局 0)
+	// 1. 记得复制一份棋盘！(currentBoard := node.Board)
+	//    千万别在原来的节点上改，否则树就乱了
+	// 2. 接下来就是你昨天写的"死循环随机落子"逻辑
+	// 3. 返回赢家 (1 或 2，平局返回 0)
 
 	// TODO: 你的代码
-	return 0 // 占位符
+	return 0
 }
 
-// Step 4: Backpropagation
-// 从 leaf 开始，一直往上找 Parent，更新 Visits 和 Wins
+// 作业 4: Backpropagation
+// 从当前节点(leaf)开始，一直往上找 Parent，更新数据
 func backpropagate(node *MCTSNode, winner int) {
 	// 提示：
-	// 1. 这是一个循环，直到 node == nil (根节点的父亲) 结束
-	// 2. node.Visits 加 1
-	// 3. 如果 winner 也就是 node.Parent.NextPlayer (谁下的这步棋导致了这个局面)，
-	//    那么 node.Wins 加 1 (或者加 0.5 如果平局)
-	//    注意：这里涉及到一个视角切换的问题，MCTS通常记录的是"这步棋对上一手下棋的人来说是否是好棋"
-
+	// 这是一个循环：for node != nil { ... node = node.Parent }
+	// 1. node.Visits++
+	// 2. 关键逻辑：如果 winner == node.Parent.NextPlayer 
+	//    (意味着导致这个局面的那个人赢了)，那么 node.Wins++
+	//    注意：MCTS 的视角通常是"父节点看子节点"，如果子节点代表的局面是"我也赢了"，那就加分
+	
 	// TODO: 你的代码
 }
 
-// -----------------------------------------------------------------------
-// 辅助函数
-// -----------------------------------------------------------------------
-
-// 计算 UCB1 值：衡量一个节点及其父节点的潜力
-// 公式：(Wins / Visits) + C * Sqrt(Log(Parent.Visits) / Visits)
+// 作业 5: UCB 公式计算
+// 计算一个节点的 UCB 值
 func calculateUCB(node *MCTSNode) float64 {
-	// TODO: 你的代码 (这是纯数学公式)
-	UCB1 := (node.Wins / float64(node.Visits)) + UCB1ExplorationConstant * math.Sqrt(math.log(node.Parent.Visits) / float64(node.Visits))
-	// 需要用到 math.Sqrt 和 math.Log
-	return UCB1
+	// 提示：
+	// 公式：(Wins / Visits) + C * Sqrt( Log(Parent.Visits) / Visits )
+	// 在 Go 里：
+	// Log 是 math.Log()
+	// Sqrt 是 math.Sqrt()
+	// 注意防止除以 0 的情况
+
+	// TODO: 你的代码
+	return 0
 }
 
-// 在根节点的所有孩子里，找 Visits 最大的那个
+// -----------------------------------------------------------------------
+// 辅助函数 (已经送给你了)
+// -----------------------------------------------------------------------
+
+// getBestChild: 找 Visits 最大的孩子 (最后一步决策用)
 func getBestChild(root *MCTSNode) *MCTSNode {
-	// TODO: 你的代码 (简单的找最大值算法)
-	max_visits := -1
-	var max_children *MCTSNode
-	for root.Children != nil {
-		if root.Children.Visits > max_visits {
-			max_visits = root.Children.Visits
-			max_children = root.Children
+	if len(root.Children) == 0 {
+		return nil
+	}
+	maxVisits := -1
+	var bestNode *MCTSNode
+	for _, child := range root.Children {
+		if child.Visits > maxVisits {
+			maxVisits = child.Visits
+			bestNode = child
 		}
 	}
-	return max_children
+	return bestNode
 }
 
-// 辅助：判断这个节点是不是还能生孩子 (IsFullyExpanded)
+// isLeaf: 判断是不是终局 (或者刚开始的空树)
+func isLeaf(node *MCTSNode) bool {
+    // 只有当没有孩子，或者游戏本身已经分出胜负时，才是叶子
+    // 简单版：没有孩子就是叶子
+	return len(node.Children) == 0
+}
+
+// isFullyExpanded: 判断这个节点是不是所有孩子都生齐了
 func isFullyExpanded(node *MCTSNode) bool {
-	// 检查 board.GetEmptyPoints 的数量 和 len(node.Children)
-	// 如果相等，说明所有路都走过了
-	
-	return false 
+    // 逻辑：如果孩子的数量 == 当前棋盘空位的数量，说明所有路都试过了
+	emptyPoints := node.Board.GetEmptyPoints()
+	return len(node.Children) == len(emptyPoints)
 }
