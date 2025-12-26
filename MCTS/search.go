@@ -66,7 +66,16 @@ func selectNode(node *MCTSNode) *MCTSNode {
 	// 如果这个节点还有空位没试过，那它就是我们要找的边缘，直接返回它，交给 expand 去扩展
 	
 	// TODO: 你的代码
-	return node 
+	for !isLeaf(node) && isFullyExpanded(node) {
+        
+		bestChild := getBestChild(node)
+
+        node = bestChild 
+    }
+
+    // 当跳出循环时，说明我们找到了一个“没满”或者“结束”的节点
+    // 这正是 Step 2 (Expansion) 梦寐以求的输入对象
+    return node
 }
 
 // 作业 2: Expansion
@@ -82,7 +91,23 @@ func expand(node *MCTSNode) *MCTSNode {
 	// 6. 返回这个新节点
 	
 	// TODO: 你的代码
-	return nil 
+	emptyPoints := node.Board.GetEmptyPoints()
+
+	var realPoints []game.Point
+	for _, point := range emptyPoints {
+		if node.Children.Board[point.X][point.Y] == 0 {
+			realPoints = append(realPoints, point)
+		}
+	}
+
+	point := realPoints[rand.Intn(len(realPoints))]
+
+	newNode := NewNode(node.Board, node, point, 1)
+	node.Board.PlaceStone(point.X, point.Y, 1) //玩家不用管吧？
+	node.Children = append(node.Children, newNode)
+
+
+	return newNode
 }
 
 // 作业 3: Simulation
@@ -120,9 +145,13 @@ func calculateUCB(node *MCTSNode) float64 {
 	// Log 是 math.Log()
 	// Sqrt 是 math.Sqrt()
 	// 注意防止除以 0 的情况
+	if node.Visits == 0 {
+		return math.MaxFloat64
+	}
+	UCB := node.Wins / float64(node.Visits) + UCB1ExplorationConstant * math.Sqrt(math.Log(float64(node.Parent.Visits))/float64(node.Visits))
 
 	// TODO: 你的代码
-	return 0
+	return UCB 
 }
 
 // -----------------------------------------------------------------------
