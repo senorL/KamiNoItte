@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>KamiNoItte - AI 五子棋</title>
+    <style>
+        body { display: flex; flex-direction: column; align-items: center; background-color: #f0f0f0; font-family: sans-serif; }
+        canvas { background-color: #deb887; box-shadow: 0 0 20px rgba(0,0,0,0.3); cursor: pointer; margin-top: 20px; border: 2px solid #8b4513; }
+        .controls { margin-top: 20px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #8b4513; color: white; border: none; border-radius: 5px; }
+        #status { margin-top: 10px; font-weight: bold; color: #333; }
+    </style>
+</head>
+<body>
+    <h1>KamiNoItte</h1>
+    <div id="status">轮到你了，执黑子（先手）</div>
+    <canvas id="chess" width="450" height="450"></canvas>
+    <div class="controls">
+        <button onclick="resetGame()">重新开始</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('chess');
+        const ctx = canvas.getContext('2d');
+        const size = 15; // 棋盘大小
+        const padding = 30;
+        const spacing = (canvas.width - padding * 2) / (size - 1);
+
+        // 绘制棋盘
+        function drawBoard() {
+            ctx.strokeStyle = "#000";
+            ctx.beginPath();
+            for (let i = 0; i < size; i++) {
+                // 横线
+                ctx.moveTo(padding, padding + i * spacing);
+                ctx.lineTo(canvas.width - padding, padding + i * spacing);
+                // 纵线
+                ctx.moveTo(padding + i * spacing, padding);
+                ctx.lineTo(padding + i * spacing, canvas.height - padding);
+            }
+            ctx.stroke();
+        }
+
+        // 绘制棋子
+        function drawStone(x, y, player) {
+            ctx.beginPath();
+            ctx.arc(padding + y * spacing, padding + x * spacing, 18, 0, 2 * Math.PI);
+            ctx.fillStyle = player === 1 ? "#000" : "#fff";
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        // 处理点击事件
+        canvas.onclick = function(e) {
+            const rect = canvas.getBoundingClientRect();
+            const y = Math.round((e.clientX - rect.left - padding) / spacing);
+            const x = Math.round((e.clientY - rect.top - padding) / spacing);
+
+            if (x >= 0 && x < size && y >= 0 && y < size) {
+                sendMove(x, y);
+            }
+        };
+
+        function sendMove(x, y) {
+            document.getElementById('status').innerText = "AI 正在思考中...";
+            fetch('/move', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ x: x, y: y })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    document.getElementById('status').innerText = "无效落子，请重试";
+                } else {
+                    renderBoard(data.board);
+                    if (data.winner !== 0) {
+                        document.getElementById('status').innerText = data.winner === 1 ? "恭喜！你赢了！" : "遗憾，AI 赢了。";
+                    } else {
+                        document.getElementById('status').innerText = "轮到你了";
+                    }
+                }
+            });
+        }
+
+        function renderBoard(boardData) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBoard();
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    if (boardData[i][j] !== 0) {
+                        drawStone(i, j, boardData[i][j]);
+                    }
+                }
+            }
+        }
+
+        function resetGame() {
+            fetch('/reset').then(() => location.reload());
+        }
+
+        drawBoard();
+    </script>
+</body>
+</html>

@@ -1,8 +1,10 @@
 package game
 
-import "fmt"
+import (
+	"fmt"
+)
 
-const Size = 9
+const Size = 15
 
 type Board [Size][Size]int
 
@@ -35,101 +37,27 @@ func (b *Board) PlaceStone(x, y int, player int) (result bool, err string) {
 }
 
 func (b *Board) CheckWin(x, y int, player int) bool {
-	// 1. 检查横向 (左右) ---------------------------------------
-	count := 1 // 先把中间这一颗算上
-
-	// 向左数 (y 减小)
-	for i := 1; i < 5; i++ {
-		// 如果越界 或者 颜色不对，就停
-		if y-i < 0 || b[x][y-i] != player {
-			break
+	dirs := [][2]int{{0, 1}, {1, 0}, {1, 1}, {1, -1}}
+	for _, d := range dirs {
+		count := 1
+		for i := 1; i < 5; i++ { // 正向
+			nx, ny := x+d[0]*i, y+d[1]*i
+			if nx < 0 || nx >= Size || ny < 0 || ny >= Size || b[nx][ny] != player {
+				break
+			}
+			count++
 		}
-		count++
-	}
-
-	// 向右数 (y 增加)
-	for i := 1; i < 5; i++ {
-		// 如果越界 或者 颜色不对，就停
-		if y+i >= Size || b[x][y+i] != player {
-			break
+		for i := 1; i < 5; i++ { // 反向
+			nx, ny := x-d[0]*i, y-d[1]*i
+			if nx < 0 || nx >= Size || ny < 0 || ny >= Size || b[nx][ny] != player {
+				break
+			}
+			count++
 		}
-		count++
-	}
-
-	// 判断是否五连
-	if count >= 5 {
-		return true
-	}
-
-	count = 1
-	// 2. 检查纵向 (上下) | ---------------------------------------
-	// 提示：重置 count = 1
-	// 向上是 x-i，向下是 x+i
-	for i := 1; i < 5; i++ {
-		if x-i < 0 || b[x-i][y] != player {
-			break
+		if count >= 5 {
+			return true
 		}
-		count++
 	}
-
-	for i := 1; i < 5; i++ {
-		if x+i >= Size || b[x+i][y] != player {
-			break
-		}
-		count++
-	}
-
-	// 判断是否五连
-	if count >= 5 {
-		return true
-	}
-
-	count = 1
-	// 3. 检查左斜 (左上到右下) \ --------------------------------
-	// 提示：左上是 (x-i, y-i)，右下是 (x+i, y+i)
-	// 请你自己写...
-	for i := 1; i < 5; i++ {
-		if x-i < 0 || y-i < 0 || b[x-i][y-i] != player {
-			break
-		}
-		count++
-	}
-
-	for i := 1; i < 5; i++ {
-		if x+i >= Size || y+i >= Size || b[x+i][y+i] != player {
-			break
-		}
-		count++
-	}
-
-	// 判断是否五连
-	if count >= 5 {
-		return true
-	}
-
-	count = 1
-
-	// 4. 检查右斜 (右上到左下) / --------------------------------
-	// 提示：右上是 (x-i, y+i)，左下是 (x+i, y-i)
-	// 请你自己写...
-	for i := 1; i < 5; i++ {
-		if x-i < 0 || y+i >= Size || b[x-i][y+i] != player {
-			break
-		}
-		count++
-	}
-
-	for i := 1; i < 5; i++ {
-		if x+i >= Size || y-i < 0 || b[x+i][y-i] != player {
-			break
-		}
-		count++
-	}
-	// 判断是否五连
-	if count >= 5 {
-		return true
-	}
-
 	return false
 }
 

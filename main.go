@@ -9,6 +9,8 @@ import (
 	"kaminotte/game"
 )
 
+const MCTScount = 10000
+
 func CVC() int {
 	board := game.Board{}
 	currentPlayer := 1
@@ -24,7 +26,7 @@ func CVC() int {
 			return 0 // 3. 直接返回，不带数值
 		}
 		// 使用 MCTS 决策当前玩家的落子
-		move := mcts.MCTSSearch(board, currentPlayer, 1000)
+		move := mcts.MCTSSearch(board, currentPlayer, MCTScount)
 		// 防御：若返回无效点，则退回随机
 		if move.X < 0 || move.Y < 0 {
 			idx := rand.Intn(len(emptyPoints))
@@ -46,15 +48,15 @@ func CVC() int {
 	}
 }
 
-func ComputerPlay(board game.Board) game.Point {
-	emptyPoints := board.GetEmptyPoints()
-	// 防御性编程：如果没有空位了（虽然理论上不会走到这）
-	if len(emptyPoints) == 0 {
-		return game.Point{X: -1, Y: -1}
-	}
-	move := emptyPoints[rand.Intn(len(emptyPoints))]
-	return move
-}
+// func ComputerPlay(board game.Board) game.Point {
+// 	emptyPoints := board.GetEmptyPoints()
+// 	// 防御性编程：如果没有空位了（虽然理论上不会走到这）
+// 	if len(emptyPoints) == 0 {
+// 		return game.Point{X: -1, Y: -1}
+// 	}
+// 	move := emptyPoints[rand.Intn(len(emptyPoints))]
+// 	return move
+// }
 
 func PVP() {
 	board := game.Board{}
@@ -116,7 +118,7 @@ func PVC() {
 			fmt.Println("电脑思考中...")
 			time.Sleep(time.Second) // 增加代入感
 			// move := ComputerPlay(board)
-			move := mcts.MCTSSearch(board, currentPlayer, 1000)
+			move := mcts.MCTSSearch(board, currentPlayer, MCTScount)
 			x, y = move.X, move.Y
 		}
 
@@ -141,7 +143,7 @@ func PVC() {
 	}
 }
 
-func main() {
+func oldmain() {
 	// 5. 设置随机数种子
 	rand.Seed(time.Now().UnixNano())
 

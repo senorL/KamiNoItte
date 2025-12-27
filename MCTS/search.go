@@ -92,22 +92,11 @@ func selectNode(node *MCTSNode) *MCTSNode {
 // 作业 2: Expansion
 // 挑一个还没长出来的动作，生成一个新的子节点
 func expand(node *MCTSNode) *MCTSNode {
-	// 提示：
-	// 1. 获取当前局面的所有空位 (board.GetEmptyPoints)
-	// 2. 这里的难点是：要过滤掉那些已经在 node.Children 里的点
-	//    (比如 (1,1) 已经在 Children 里了，就不能再 expand 它了)
-	// 3. 从剩下的未尝试空位里，随机挑一个
-	// 4. 执行落子 (PlaceStone)，创建新节点 (NewNode)
-	// 5. 把新节点 append 到 node.Children 里
-	// 6. 返回这个新节点
-
-	// 终局则不再扩展
 	if term, _ := hasWinner(node); term {
 		return node
 	}
-	// TODO: 你的代码
-	emptyPoints := node.Board.GetEmptyPoints()
 
+	emptyPoints := node.Board.GetEmptyPoints()
 	var realPoints []game.Point
 	for _, point := range emptyPoints {
 		alreadyExpanded := false
@@ -126,33 +115,15 @@ func expand(node *MCTSNode) *MCTSNode {
 		return node
 	}
 
+	// --- 以下是加入 Zobrist 的改动 ---
 	point := realPoints[rand.Intn(len(realPoints))]
-
 	newBoard := node.Board.Clone()
-
 	newBoard.PlaceStone(point.X, point.Y, node.NextPlayer)
 
-	newNode := NewNode(newBoard, node, point, 3-node.NextPlayer)
-
-	node.Children = append(node.Children, newNode)
-
-	return newNode
-}
-
-// 作业 3: Simulation
+    // 3. 没见过，创建新节点并存表
+    newNode := NewNode(newBoard, node, point, 3-node.NextPlayer)
 // 快速随机模拟直到游戏结束
 func simulate(node *MCTSNode) int {
-	// 提示：
-	// 1. 记得复制一份棋盘！(currentBoard := node.Board)
-	//    千万别在原来的节点上改，否则树就乱了
-	// 2. 接下来就是你昨天写的"死循环随机落子"逻辑
-	// 3. 返回赢家 (1 或 2，平局返回 0)
-
-	// 若该节点已为终局，直接返回赢家
-	if term, win := hasWinner(node); term {
-		return win
-	}
-	// TODO: 你的代码
 	currentBoard := node.Board.Clone()
 	currentPlayer := node.NextPlayer
 
@@ -162,20 +133,30 @@ func simulate(node *MCTSNode) int {
 			return 0
 		}
 
-		idx := rand.Intn(len(emptyPoints))
-		move := emptyPoints[idx]
+		var move game.Point
+		foundSpecial := false
 
-		ok, _ := currentBoard.PlaceStone(move.X, move.Y, currentPlayer)
-		if !ok {
-			continue
+		for _, p := range emptyPoints {
+			if currentBoard.CheckWin(p.X, p.Y, currentPlayer) {
+				return currentPlayer
+			}
 		}
 
-		if currentBoard.CheckWin(move.X, move.Y, currentPlayer) {
-			return currentPlayer
+		for _, p := range emptyPoints {
+			if currentBoard.CheckWin(p.X, p.Y, 3-currentPlayer) {
+				move = p
+				foundSpecial = true
+				break
+			}
 		}
+
+		if !foundSpecial {
+			move = emptyPoints[rand.Intn(len(emptyPoints))]
+		}
+
+		currentBoard.PlaceStone(move.X, move.Y, currentPlayer)
 		currentPlayer = 3 - currentPlayer
 	}
-
 }
 
 // 作业 4: Backpropagation
