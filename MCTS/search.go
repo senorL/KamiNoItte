@@ -120,8 +120,12 @@ func expand(node *MCTSNode) *MCTSNode {
 	newBoard := node.Board.Clone()
 	newBoard.PlaceStone(point.X, point.Y, node.NextPlayer)
 
-    // 3. 没见过，创建新节点并存表
-    newNode := NewNode(newBoard, node, point, 3-node.NextPlayer)
+	// 3. 没见过，创建新节点并存表
+	newNode := NewNode(newBoard, node, point, 3-node.NextPlayer)
+	node.Children = append(node.Children, newNode)
+	return newNode
+}
+
 // 快速随机模拟直到游戏结束
 func simulate(node *MCTSNode) int {
 	currentBoard := node.Board.Clone()

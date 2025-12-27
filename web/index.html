@@ -22,7 +22,7 @@
     <script>
         const canvas = document.getElementById('chess');
         const ctx = canvas.getContext('2d');
-        const size = 15; // 棋盘大小
+        const size = 9; // 棋盘大小
         const padding = 30;
         const spacing = (canvas.width - padding * 2) / (size - 1);
 
@@ -44,7 +44,8 @@
         // 绘制棋子
         function drawStone(x, y, player) {
             ctx.beginPath();
-            ctx.arc(padding + y * spacing, padding + x * spacing, 18, 0, 2 * Math.PI);
+            const radius = spacing * 0.4; // 动态计算半径，设为间距的 0.4 倍
+            ctx.arc(padding + y * spacing, padding + x * spacing, radius, 0, 2 * Math.PI);
             ctx.fillStyle = player === 1 ? "#000" : "#fff";
             ctx.fill();
             ctx.stroke();

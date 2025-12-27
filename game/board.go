@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-const Size = 15
+const Size = 9
 
 type Board [Size][Size]int
 
