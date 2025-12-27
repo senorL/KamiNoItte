@@ -95,17 +95,31 @@ func expand(node *MCTSNode) *MCTSNode {
 
 	var realPoints []game.Point
 	for _, point := range emptyPoints {
-		if node.Children.Board[point.X][point.Y] == 0 {
+		alreadyExpanded := false
+		for _, child := range node.Children {
+			if child.Move.X == point.X && child.Move.Y == point.Y {
+				alreadyExpanded = true
+				break
+			}
+		}
+		if !alreadyExpanded {
 			realPoints = append(realPoints, point)
 		}
 	}
 
+	if len(realPoints) == 0 {
+		return node
+	}
+
 	point := realPoints[rand.Intn(len(realPoints))]
 
-	newNode := NewNode(node.Board, node, point, 1)
-	node.Board.PlaceStone(point.X, point.Y, 1) //玩家不用管吧？
-	node.Children = append(node.Children, newNode)
+	newBoard := node.Board.Clone()
 
+	newBoard.PlaceStone(point.X, point.Y, node.NextPlayer)
+
+	newNode := NewNode(newBoard, node, point, 3 - node.NextPlayer)
+
+	node.Children = append(node.Children, newNode)
 
 	return newNode
 }
@@ -120,20 +134,43 @@ func simulate(node *MCTSNode) int {
 	// 3. 返回赢家 (1 或 2，平局返回 0)
 
 	// TODO: 你的代码
-	return 0
+	currentBoard := node.Board.Clone()
+    currentPlayer := node.NextPlayer
+
+    for {
+        emptyPoints := currentBoard.GetEmptyPoints()
+        if len(emptyPoints) == 0 {
+            return 0
+        }
+        
+        idx := rand.Intn(len(emptyPoints))
+        move := emptyPoints[idx]
+        
+        ok, _ := currentBoard.PlaceStone(move.X, move.Y, currentPlayer)
+        if !ok { continue }
+
+        if currentBoard.CheckWin(move.X, move.Y, currentPlayer) {
+            return currentPlayer
+        }
+        currentPlayer = 3 - currentPlayer
+    }
+
 }
 
 // 作业 4: Backpropagation
 // 从当前节点(leaf)开始，一直往上找 Parent，更新数据
 func backpropagate(node *MCTSNode, winner int) {
-	// 提示：
-	// 这是一个循环：for node != nil { ... node = node.Parent }
-	// 1. node.Visits++
-	// 2. 关键逻辑：如果 winner == node.Parent.NextPlayer 
-	//    (意味着导致这个局面的那个人赢了)，那么 node.Wins++
-	//    注意：MCTS 的视角通常是"父节点看子节点"，如果子节点代表的局面是"我也赢了"，那就加分
-	
-	// TODO: 你的代码
+	for node != nil {
+		node.Visits++
+		// 如果赢家是该节点“产生时”的玩家，则计分
+
+		if winner != 0 && winner != node.NextPlayer {
+			node.Wins += 1.0
+		} else if winner == 0 {
+			node.Wins += 0.5 // 平局计 0.5
+		}
+		node = node.Parent // 向上爬
+	}
 }
 
 // 作业 5: UCB 公式计算
