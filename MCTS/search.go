@@ -1,9 +1,9 @@
 package mcts
 
 import (
+	"kaminotte/game"
 	"math"
 	"math/rand"
-	"kaminotte/game"
 )
 
 // UCB1ExplorationConstant 是 UCB 公式里的 C 值
@@ -43,7 +43,7 @@ func MCTSSearch(rootBoard game.Board, nextPlayer int, iterations int) game.Point
 	// 3. 思考时间到，选择访问次数(Visits)最多的那个孩子作为下一步
 	// 注意：这里通常不选胜率最高的，而是选Visits最多的，因为Visits多说明最靠谱
 	bestChild := getBestChild(root)
-	
+
 	// 防御性编程：如果没有孩子（比如棋盘满了），返回一个特殊值
 	if bestChild == nil {
 		return game.Point{X: -1, Y: -1}
@@ -64,18 +64,29 @@ func selectNode(node *MCTSNode) *MCTSNode {
 	// 在循环里，你需要找到 UCB 值最大的那个孩子，然后 node = bestChild
 	// 只有当一个节点的所有可能落子都被长出子节点了，我们才用 UCB 去选深一层的
 	// 如果这个节点还有空位没试过，那它就是我们要找的边缘，直接返回它，交给 expand 去扩展
-	
-	// TODO: 你的代码
-	for !isLeaf(node) && isFullyExpanded(node) {
-        
-		bestChild := getBestChild(node)
 
-        node = bestChild 
-    }
-
-    // 当跳出循环时，说明我们找到了一个“没满”或者“结束”的节点
-    // 这正是 Step 2 (Expansion) 梦寐以求的输入对象
-    return node
+	for {
+		// 若当前节点已是终局，直接返回
+		terminal, _ := hasWinner(node)
+		if terminal {
+			return node
+		}
+		// 若还有未扩展动作，交给 expand
+		if !isFullyExpanded(node) || len(node.Children) == 0 {
+			return node
+		}
+		// 使用 UCB 选择最优孩子下探
+		best := node.Children[0]
+		bestU := calculateUCB(best)
+		for i := 1; i < len(node.Children); i++ {
+			u := calculateUCB(node.Children[i])
+			if u > bestU {
+				best = node.Children[i]
+				bestU = u
+			}
+		}
+		node = best
+	}
 }
 
 // 作业 2: Expansion
@@ -89,7 +100,11 @@ func expand(node *MCTSNode) *MCTSNode {
 	// 4. 执行落子 (PlaceStone)，创建新节点 (NewNode)
 	// 5. 把新节点 append 到 node.Children 里
 	// 6. 返回这个新节点
-	
+
+	// 终局则不再扩展
+	if term, _ := hasWinner(node); term {
+		return node
+	}
 	// TODO: 你的代码
 	emptyPoints := node.Board.GetEmptyPoints()
 
@@ -117,7 +132,7 @@ func expand(node *MCTSNode) *MCTSNode {
 
 	newBoard.PlaceStone(point.X, point.Y, node.NextPlayer)
 
-	newNode := NewNode(newBoard, node, point, 3 - node.NextPlayer)
+	newNode := NewNode(newBoard, node, point, 3-node.NextPlayer)
 
 	node.Children = append(node.Children, newNode)
 
@@ -133,27 +148,33 @@ func simulate(node *MCTSNode) int {
 	// 2. 接下来就是你昨天写的"死循环随机落子"逻辑
 	// 3. 返回赢家 (1 或 2，平局返回 0)
 
+	// 若该节点已为终局，直接返回赢家
+	if term, win := hasWinner(node); term {
+		return win
+	}
 	// TODO: 你的代码
 	currentBoard := node.Board.Clone()
-    currentPlayer := node.NextPlayer
+	currentPlayer := node.NextPlayer
 
-    for {
-        emptyPoints := currentBoard.GetEmptyPoints()
-        if len(emptyPoints) == 0 {
-            return 0
-        }
-        
-        idx := rand.Intn(len(emptyPoints))
-        move := emptyPoints[idx]
-        
-        ok, _ := currentBoard.PlaceStone(move.X, move.Y, currentPlayer)
-        if !ok { continue }
+	for {
+		emptyPoints := currentBoard.GetEmptyPoints()
+		if len(emptyPoints) == 0 {
+			return 0
+		}
 
-        if currentBoard.CheckWin(move.X, move.Y, currentPlayer) {
-            return currentPlayer
-        }
-        currentPlayer = 3 - currentPlayer
-    }
+		idx := rand.Intn(len(emptyPoints))
+		move := emptyPoints[idx]
+
+		ok, _ := currentBoard.PlaceStone(move.X, move.Y, currentPlayer)
+		if !ok {
+			continue
+		}
+
+		if currentBoard.CheckWin(move.X, move.Y, currentPlayer) {
+			return currentPlayer
+		}
+		currentPlayer = 3 - currentPlayer
+	}
 
 }
 
@@ -185,10 +206,10 @@ func calculateUCB(node *MCTSNode) float64 {
 	if node.Visits == 0 {
 		return math.MaxFloat64
 	}
-	UCB := node.Wins / float64(node.Visits) + UCB1ExplorationConstant * math.Sqrt(math.Log(float64(node.Parent.Visits))/float64(node.Visits))
+	UCB := node.Wins/float64(node.Visits) + UCB1ExplorationConstant*math.Sqrt(math.Log(float64(node.Parent.Visits))/float64(node.Visits))
 
 	// TODO: 你的代码
-	return UCB 
+	return UCB
 }
 
 // -----------------------------------------------------------------------
@@ -213,14 +234,30 @@ func getBestChild(root *MCTSNode) *MCTSNode {
 
 // isLeaf: 判断是不是终局 (或者刚开始的空树)
 func isLeaf(node *MCTSNode) bool {
-    // 只有当没有孩子，或者游戏本身已经分出胜负时，才是叶子
-    // 简单版：没有孩子就是叶子
+	// 只有当没有孩子，或者游戏本身已经分出胜负时，才是叶子
+	// 简单版：没有孩子就是叶子
 	return len(node.Children) == 0
 }
 
 // isFullyExpanded: 判断这个节点是不是所有孩子都生齐了
 func isFullyExpanded(node *MCTSNode) bool {
-    // 逻辑：如果孩子的数量 == 当前棋盘空位的数量，说明所有路都试过了
+	// 逻辑：如果孩子的数量 == 当前棋盘空位的数量，说明所有路都试过了
 	emptyPoints := node.Board.GetEmptyPoints()
 	return len(node.Children) == len(emptyPoints)
+}
+
+// hasWinner 判断当前节点是否为终局，并返回是否终局与赢家(1/2，平局为0)
+func hasWinner(node *MCTSNode) (bool, int) {
+	// 非根节点：根据上一步落子判定
+	if node.Move.X >= 0 && node.Move.Y >= 0 {
+		lastPlayer := 3 - node.NextPlayer
+		if node.Board.CheckWin(node.Move.X, node.Move.Y, lastPlayer) {
+			return true, lastPlayer
+		}
+	}
+	// 平局：无空位
+	if len(node.Board.GetEmptyPoints()) == 0 {
+		return true, 0
+	}
+	return false, 0
 }
